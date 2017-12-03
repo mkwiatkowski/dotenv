@@ -33,17 +33,16 @@ module Dotenv
       attr_reader :substitutions
 
       def call(string)
-        new(string).call
+        new.call(string)
       end
     end
 
-    def initialize(string)
-      @string = string
+    def initialize
       @hash = {}
     end
 
-    def call
-      @string.split(/[\n\r]+/).each do |line|
+    def call(string)
+      string.split(/[\n\r]+/).each do |line|
         parse_line(line)
       end
       @hash
