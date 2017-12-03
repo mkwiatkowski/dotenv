@@ -54,9 +54,9 @@ module Dotenv
     def parse_line(line)
       if (match = line.match(LINE))
         key, value = match.captures
-        @hash[key] = parse_value(value || "")
+        @hash[key] = parse_value(value || "", @hash)
       elsif line.split.first == "export"
-        if variable_not_set?(line)
+        if variable_not_set?(line, @hash)
           raise FormatError, "Line #{line.inspect} has an unset variable"
         end
       elsif line !~ /\A\s*(?:#.*)?\z/ # not comment or blank line
@@ -64,13 +64,14 @@ module Dotenv
       end
     end
 
-    def parse_value(value)
+    def parse_value(value, env)
       # Remove surrounding quotes
       expand_interpolations(
         expand_newlines_when_quoted(
           value.strip.sub(/\A(['"])(.*)\1\z/, '\2'),
           Regexp.last_match(1)),
-        Regexp.last_match(1))
+        Regexp.last_match(1),
+        env)
     end
 
     def expand_newlines_when_quoted(value, last_match)
@@ -81,10 +82,10 @@ module Dotenv
       end
     end
 
-    def expand_interpolations(initial_value, last_match)
+    def expand_interpolations(initial_value, last_match, env)
       if last_match != "'"
         self.class.substitutions.inject(initial_value) do |value, proc|
-          proc.call(value, @hash)
+          proc.call(value, env)
         end
       else
         initial_value
@@ -99,8 +100,8 @@ module Dotenv
       value.gsub('\n', "\n").gsub('\r', "\r")
     end
 
-    def variable_not_set?(line)
-      !line.split[1..-1].all? { |var| @hash.member?(var) }
+    def variable_not_set?(line, env)
+      !line.split[1..-1].all? { |var| env.member?(var) }
     end
   end
 end
