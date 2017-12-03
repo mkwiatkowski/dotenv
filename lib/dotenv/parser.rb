@@ -7,7 +7,7 @@ module Dotenv
   # This class enables parsing of a string for key value pairs to be returned
   # and stored in the Environment. It allows for variable substitutions and
   # exporting of variables.
-  class Parser
+  module Parser
     SUBSTITUTIONS =
       [Dotenv::Substitutions::Variable, Dotenv::Substitutions::Command]
 
@@ -31,74 +31,69 @@ module Dotenv
 
     class << self
       def call(string)
-        new.call(string)
+        string.split(/[\n\r]+/).inject({}) do |env, line|
+          parse_line(line, env)
+        end
       end
-    end
 
+      private
 
-    def call(string)
-      string.split(/[\n\r]+/).inject({}) do |env, line|
-        parse_line(line, env)
-      end
-    end
-
-    private
-
-    def parse_line(line, env)
-      if (match = line.match(LINE))
-        key, value = match.captures
-        env.merge({key => parse_value(value || "", env)})
-      elsif line.split.first == "export"
-        if variable_not_set?(line, env)
-          raise FormatError, "Line #{line.inspect} has an unset variable"
+      def parse_line(line, env)
+        if (match = line.match(LINE))
+          key, value = match.captures
+          env.merge({key => parse_value(value || "", env)})
+        elsif line.split.first == "export"
+          if variable_not_set?(line, env)
+            raise FormatError, "Line #{line.inspect} has an unset variable"
+          else
+            env
+          end
+        elsif line !~ /\A\s*(?:#.*)?\z/ # not comment or blank line
+          raise FormatError, "Line #{line.inspect} doesn't match format"
         else
           env
         end
-      elsif line !~ /\A\s*(?:#.*)?\z/ # not comment or blank line
-        raise FormatError, "Line #{line.inspect} doesn't match format"
-      else
-        env
       end
-    end
 
-    def parse_value(value, env)
-      # Remove surrounding quotes
-      expand_interpolations(
-        expand_newlines_when_quoted(
-          value.strip.sub(/\A(['"])(.*)\1\z/, '\2'),
-          Regexp.last_match(1)),
-        Regexp.last_match(1),
-        env)
-    end
-
-    def expand_newlines_when_quoted(value, last_match)
-      if last_match == '"'
-        unescape_characters(expand_newlines(value))
-      else
-        value
+      def parse_value(value, env)
+        # Remove surrounding quotes
+        expand_interpolations(
+          expand_newlines_when_quoted(
+            value.strip.sub(/\A(['"])(.*)\1\z/, '\2'),
+            Regexp.last_match(1)),
+          Regexp.last_match(1),
+          env)
       end
-    end
 
-    def expand_interpolations(initial_value, last_match, env)
-      if last_match != "'"
-        SUBSTITUTIONS.inject(initial_value) do |value, proc|
-          proc.call(value, env)
+      def expand_newlines_when_quoted(value, last_match)
+        if last_match == '"'
+          unescape_characters(expand_newlines(value))
+        else
+          value
         end
-      else
-        initial_value
       end
-    end
 
-    def unescape_characters(value)
-      value.gsub(/\\([^$])/, '\1')
-    end
+      def expand_interpolations(initial_value, last_match, env)
+        if last_match != "'"
+          SUBSTITUTIONS.inject(initial_value) do |value, proc|
+            proc.call(value, env)
+          end
+        else
+          initial_value
+        end
+      end
 
-    def expand_newlines(value)
-      value.gsub('\n', "\n").gsub('\r', "\r")
-    end
+      def unescape_characters(value)
+        value.gsub(/\\([^$])/, '\1')
+      end
 
-    def variable_not_set?(line, env)
-      !line.split[1..-1].all? { |var| env.member?(var) }
+      def expand_newlines(value)
+        value.gsub('\n', "\n").gsub('\r', "\r")
+      end
+
+      def variable_not_set?(line, env)
+        !line.split[1..-1].all? { |var| env.member?(var) }
+      end
     end
   end
 end
