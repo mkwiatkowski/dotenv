@@ -29,7 +29,41 @@ module Dotenv
       \z
     /x
 
+    module FluentInterface
+      refine String do
+        def expand_newlines_when_quoted(last_match)
+          if last_match == '"'
+            self.
+              expand_newlines.
+              unescape_characters
+          else
+            self
+          end
+        end
+
+        def expand_interpolations(last_match, env)
+          if last_match != "'"
+            SUBSTITUTIONS.inject(self) do |value, proc|
+              proc.call(value, env)
+            end
+          else
+            self
+          end
+        end
+
+        def unescape_characters
+          self.gsub(/\\([^$])/, '\1')
+        end
+
+        def expand_newlines
+          self.gsub('\n', "\n").gsub('\r', "\r")
+        end
+      end
+    end
+
     class << self
+      using FluentInterface
+
       def call(string)
         string.split(/[\n\r]+/).inject({}) do |env, line|
           parse_line(line, env)
@@ -56,39 +90,12 @@ module Dotenv
       end
 
       def parse_value(value, env)
-        # Remove surrounding quotes
-        expand_interpolations(
-          expand_newlines_when_quoted(
-            value.strip.sub(/\A(['"])(.*)\1\z/, '\2'),
-            Regexp.last_match(1)),
-          Regexp.last_match(1),
-          env)
-      end
-
-      def expand_newlines_when_quoted(value, last_match)
-        if last_match == '"'
-          unescape_characters(expand_newlines(value))
-        else
-          value
-        end
-      end
-
-      def expand_interpolations(initial_value, last_match, env)
-        if last_match != "'"
-          SUBSTITUTIONS.inject(initial_value) do |value, proc|
-            proc.call(value, env)
-          end
-        else
-          initial_value
-        end
-      end
-
-      def unescape_characters(value)
-        value.gsub(/\\([^$])/, '\1')
-      end
-
-      def expand_newlines(value)
-        value.gsub('\n', "\n").gsub('\r', "\r")
+        value.
+          strip.
+          # Remove surrounding quotes
+          sub(/\A(['"])(.*)\1\z/, '\2').
+          expand_newlines_when_quoted(Regexp.last_match(1)).
+          expand_interpolations(Regexp.last_match(1), env)
       end
 
       def variable_not_set?(line, env)
