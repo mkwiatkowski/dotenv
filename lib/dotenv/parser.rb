@@ -66,18 +66,29 @@ module Dotenv
 
     def parse_value(value)
       # Remove surrounding quotes
-      value = value.strip.sub(/\A(['"])(.*)\1\z/, '\2')
+      expand_interpolations(
+        expand_newlines_when_quoted(
+          value.strip.sub(/\A(['"])(.*)\1\z/, '\2'),
+          Regexp.last_match(1)),
+        Regexp.last_match(1))
+    end
 
-      if Regexp.last_match(1) == '"'
-        value = unescape_characters(expand_newlines(value))
+    def expand_newlines_when_quoted(value, last_match)
+      if last_match == '"'
+        unescape_characters(expand_newlines(value))
+      else
+        value
       end
+    end
 
-      if Regexp.last_match(1) != "'"
-        self.class.substitutions.each do |proc|
-          value = proc.call(value, @hash)
+    def expand_interpolations(initial_value, last_match)
+      if last_match != "'"
+        self.class.substitutions.inject(initial_value) do |value, proc|
+          proc.call(value, @hash)
         end
+      else
+        initial_value
       end
-      value
     end
 
     def unescape_characters(value)
