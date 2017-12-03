@@ -43,23 +43,27 @@ module Dotenv
 
     def call(string)
       string.split(/[\n\r]+/).each do |line|
-        parse_line(line)
+        @hash = parse_line(line, @hash)
       end
       @hash
     end
 
     private
 
-    def parse_line(line)
+    def parse_line(line, env)
       if (match = line.match(LINE))
         key, value = match.captures
-        @hash[key] = parse_value(value || "", @hash)
+        env.merge({key => parse_value(value || "", env)})
       elsif line.split.first == "export"
-        if variable_not_set?(line, @hash)
+        if variable_not_set?(line, env)
           raise FormatError, "Line #{line.inspect} has an unset variable"
+        else
+          env
         end
       elsif line !~ /\A\s*(?:#.*)?\z/ # not comment or blank line
         raise FormatError, "Line #{line.inspect} doesn't match format"
+      else
+        env
       end
     end
 
