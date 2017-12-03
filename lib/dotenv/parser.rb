@@ -8,7 +8,7 @@ module Dotenv
   # and stored in the Environment. It allows for variable substitutions and
   # exporting of variables.
   class Parser
-    @substitutions =
+    SUBSTITUTIONS =
       [Dotenv::Substitutions::Variable, Dotenv::Substitutions::Command]
 
     LINE = /
@@ -30,8 +30,6 @@ module Dotenv
     /x
 
     class << self
-      attr_reader :substitutions
-
       def call(string)
         new.call(string)
       end
@@ -83,7 +81,7 @@ module Dotenv
 
     def expand_interpolations(initial_value, last_match, env)
       if last_match != "'"
-        self.class.substitutions.inject(initial_value) do |value, proc|
+        SUBSTITUTIONS.inject(initial_value) do |value, proc|
           proc.call(value, env)
         end
       else
