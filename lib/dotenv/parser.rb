@@ -37,15 +37,11 @@ module Dotenv
       end
     end
 
-    def initialize
-      @hash = {}
-    end
 
     def call(string)
-      string.split(/[\n\r]+/).each do |line|
-        @hash = parse_line(line, @hash)
+      string.split(/[\n\r]+/).inject({}) do |env, line|
+        parse_line(line, env)
       end
-      @hash
     end
 
     private
